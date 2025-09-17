@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>FEBOS — iPhone-like Setup (Sim)</title>
+<style>
+  :root{
+    --bg:#040405; --panel:#0b0f14; --accent:#38b6ff; --glass: rgba(255,255,255,0.03);
+    --muted:#95a6b6; --ok:#2dd4bf;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background: radial-gradient(circle at 20% 10%, rgba(56,182,255,0.03), transparent 6%),
+                linear-gradient(180deg,#020306 0%, #040405 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial; color:#ecf8ff;
+  }
+
+  /* Device frame */
+  .device{
+    width:420px; height:780px; border-radius:28px; padding:18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.012), rgba(0,0,0,0.14));
+    box-shadow: 0 30px 80px rgba(2,8,15,0.7); position:relative; overflow:hidden;
+  }
+  .screen{
+    width:100%; height:100%; border-radius:16px; background:linear-gradient(180deg, rgba(0,0,0,0.20), rgba(255,255,255,0.02));
+    padding:28px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
+  }
+
+  /* Boot */
+  .boot {
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+  }
+  .logo {
+    font-size:56px; font-weight:900; letter-spacing:6px; opacity:0; transform:scale(.92);
+    transition: all .6s cubic-bezier(.2,.9,.1,1);
+    text-shadow: 0 12px 40px rgba(56,182,255,0.06);
+  }
+  .logo.show{ opacity:1; transform:scale(1); }
+  .glow { position:absolute; width:260px; height:260px; border-radius:50%; background:radial-gradient(circle, rgba(56,182,255,0.18) 0%, rgba(56,182,255,0.03) 40%, transparent 60%); filter:blur(28px); opacity:0; transition:opacity .6s; }
+  .glow.show{ opacity:1; }
+
+  .boot-spinner{
+    width:46px; height:46px; border-radius:50%; border:4px solid rgba(255,255,255,0.08);
+    border-top-color:var(--accent); animation:spin 1s linear infinite; opacity:0; transform:translateY(6px);
+    transition: all .5s;
+  }
+  .boot-spinner.show{ opacity:1; transform:translateY(0); }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* wizard container */
+  .wizard{ position:absolute; inset:0; display:flex; flex-direction:column; padding:28px; gap:12px; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; color:var(--muted); font-size:13px; }
+  .progress{
+    height:6px; background:rgba(255,255,255,0.03); border-radius:999px; overflow:hidden; margin-top:10px;
+  }
+  .progress > i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--accent), #78d0ff); border-radius:999px; transition:width .36s ease; }
+
+  .card{
+    margin-top:8px; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:12px; padding:14px; flex:1; display:flex; flex-direction:column; gap:12px; border:1px solid rgba(255,255,255,0.03);
+    box-shadow: 0 10px 30px rgba(2,8,15,0.6);
+  }
+
+  h1{ margin:0; font-size:20px; color:#eaf7ff; }
+  p.muted{ margin:0; color:var(--muted); font-size:13px; }
+
+  select,input,button,textarea{ font-size:15px; padding:10px 12px; border-radius:10px; border:none; background:var(--glass); color:inherit; outline:none; }
+  .btn-row{ display:flex; gap:10px; margin-top:auto; }
+  .btn { flex:1; padding:12px; border-radius:12px; border:none; background:linear-gradient(90deg,var(--accent), #7bd7ff); color:#012; font-weight:700; cursor:pointer; box-shadow:0 8px 18px rgba(56,182,255,0.12); }
+  .btn.ghost{ background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.03); box-shadow:none; }
+
+  /* wifi list */
+  .wifi-list{ overflow:auto; max-height:180px; padding-right:6px; }
+  .wifi-item{ display:flex; justify-content:space-between; padding:10px; border-radius:10px; margin-bottom:8px; background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.02); cursor:pointer; }
+  .wifi-item.selected{ border:1px solid rgba(56,182,255,0.6); box-shadow:0 8px 20px rgba(56,182,255,0.05); }
+
+  /* passcode keypad */
+  .passcode-circle{ display:flex; gap:10px; justify-content:center; margin-top:8px; }
+  .dot{ width:14px; height:14px; border-radius:50%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.03); }
+  .dot.on{ background:var(--accent); box-shadow:0 6px 16px rgba(56,182,255,0.14); }
+
+  .keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:10px; }
+  .key{ padding:14px; border-radius:12px; background:rgba(255,255,255,0.02); text-align:center; user-select:none; cursor:pointer; font-weight:700; }
+
+  /* face id */
+  .face-scan{ width:140px; height:140px; margin:10px auto; border-radius:999px; border:2px solid rgba(255,255,255,0.04); display:grid; place-items:center; position:relative; overflow:hidden; }
+  .scan-line{ position:absolute; left:0; top:-40%; height:40%; width:100%; background:linear-gradient(180deg, rgba(255,255,255,0.00), rgba(56,182,255,0.16)); transform:translateY(-120%); transition:transform .9s linear; }
+  .scan-line.active{ transform:translateY(220%); }
+
+  /* final home */
+  .home{ text-align:center; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; }
+  .app-grid{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:12px; }
+  .app{ width:86px; height:86px; border-radius:18px; background:rgba(255,255,255,0.02); display:grid; place-items:center; font-weight:700; }
+
+  /* swipe hint */
+  .swipe-hint{ font-size:12px; color:var(--muted); text-align:center; margin-top:6px; }
+
+  @media (max-width:420px){
+    .device{ width:360px; height:740px; }
+  }
+</style>
+</head>
+<body>
+  <div class="device" id="device" role="application" aria-label="FEBOS setup simulator">
+    <div class="screen" id="screen">
+      <!-- Glow & Boot -->
+      <div class="glow" id="glow"></div>
+
+      <!-- Boot -->
+      <div id="bootElem" class="boot" aria-hidden="false">
+        <div class="logo" id="logoText">FEBOS</div>
+        <div class="boot-spinner" id="bootSpinner"></div>
+        <div class="swipe-hint" style="opacity:0.9;color:var(--muted);">Simulasi booting — tunggu sebentar</div>
+      </div>
+
+      <!-- Wizard -->
+      <div class="wizard" id="wizard" style="display:none">
+        <div class="topbar">
+          <div id="leftTop">Quick Start</div>
+          <div id="stepIndicator" style="text-align:center;">Step <strong id="stepNum">1</strong>/<span id="stepTotal">7</span></div>
+          <div id="rightTop" style="text-align:right" class="muted">FEBOS</div>
+        </div>
+        <div class="progress" aria-hidden="true"><i id="progBar"></i></div>
+
+        <div class="card" id="cardArea">
+          <!-- dynamic content injected here -->
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <button class="btn ghost" id="backBtn">Back</button>
+          <button class="btn" id="nextBtn">Next</button>
+        </div>
+      </div>
+
+      <!-- Home Screen -->
+      <div id="homeScreen" style="display:none; width:100%; padding:28px;">
+        <div class="home">
+          <div style="font-size:26px; font-weight:900;">Welcome to FEBOS</div>
+          <div class="muted" id="homeSub">Signed in as —</div>
+          <div class="app-grid" id="apps">
+            <div class="app">Foto</div><div class="app">Settings</div><div class="app">Browser</div><div class="app">Music</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Sequence & UI
+  const bootElem = document.getElementById('bootElem');
+  const logoText = document.getElementById('logoText');
+  const bootSpinner = document.getElementById('bootSpinner');
+  const glow = document.getElementById('glow');
+  const wizard = document.getElementById('wizard');
+  const cardArea = document.getElementById('cardArea');
+  const backBtn = document.getElementById('backBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const progBar = document.getElementById('progBar');
+  const stepNum = document.getElementById('stepNum');
+  const stepTotal = document.getElementById('stepTotal');
+  const homeScreen = document.getElementById('homeScreen');
+  const homeSub = document.getElementById('homeSub');
+
+  const steps = [
+    {id:'lang', title:'Pilih Bahasa', render: renderLang},
+    {id:'region', title:'Pilih Negara/Wilayah', render: renderRegion},
+    {id:'wifi', title:'Sambungkan ke Wi-Fi', render: renderWifi},
+    {id:'face', title:'Face ID (Dummy)', render: renderFace},
+    {id:'pass', title:'Buat Passcode', render: renderPass},
+    {id:'signin', title:'Sign in FEBOS ID', render: renderSignin},
+    {id:'terms', title:'Syarat & Finish', render: renderTerms}
+  ];
+  stepTotal.textContent = steps.length;
+  let idx = 0;
+  const state = {
+    lang:'Bahasa Indonesia',
+    region:'Indonesia',
+    wifi:null, wifiPw:'',
+    face:false,
+    passcode:'',
+    febosId:'',
+    accepted:false
+  };
+
+  // Boot animation
+  setTimeout(()=>{ logoText.classList.add('show'); glow.classList.add('show'); },300);
+  setTimeout(()=>{ bootSpinner.classList.add('show'); },900);
+
+  // after boot -> show wizard
+  setTimeout(()=> {
+    bootElem.style.display='none';
+    wizard.style.display='flex';
+    showStep(0);
+  },3600);
+
+  function setProgress(i){
+    const pct = Math.round(((i+1)/steps.length)*100);
+    progBar.style.width = pct + '%';
+    stepNum.textContent = i+1;
+  }
+
+  function showStep(i){
+    idx = i;
+    setProgress(i);
+    cardArea.innerHTML = '';
+    steps[i].render(cardArea);
+    backBtn.style.display = i===0 ? 'none' : 'inline-block';
+    nextBtn.textContent = i === steps.length-1 ? 'Finish' : 'Next';
+  }
+
+  backBtn.addEventListener('click', ()=> {
+    if(idx>0) showStep(idx-1);
+  });
+
+  nextBtn.addEventListener('click', ()=>{
+    // per-step validation
+    if(!validateStep(idx)) return;
+    if(idx === steps.length-1){
+      finishSetup();
+    } else {
+      showStep(idx+1);
+    }
+  });
+
+  // ---------- renderers ----------
+  function renderLang(container){
+    const el = document.createElement('div');
+    el.innerHTML = `<h1>Pilih Bahasa</h1><p class="muted">Pilih bahasa sistem FEBOS.</p>
+      <select id="selLang">
+        <option>Bahasa Indonesia</option>
+        <option>English</option>
+        <option>Español</option>
+        <option>Français</option>
+      </select>
+      <p class="muted" style="margin-top:8px">Kamu bisa ubah bahasa kapan saja di Settings.</p>`;
+    container.appendChild(el);
+    const sel = el.querySelector('#selLang');
+    sel.value = state.lang;
+    sel.addEventListener('change', ()=> state.lang = sel.value);
+  }
+
+  function renderRegion(container){
+    const el = document.createElement('div');
+    el.innerHTML = `<h1>Negara / Wilayah</h1><p class="muted">Pilih negara untuk format waktu & layanan.</p>
+      <select id="selRegion">
+        <option>Indonesia</option><option>United States</option><option>United Kingdom</option><option>Japan</option>
+      </select>`;
+    container.appendChild(el);
+    const sel = el.querySelector('#selRegion');
+    sel.value = state.region;
+    sel.addEventListener('change', ()=> state.region = sel.value);
+  }
+
+  function renderWifi(container){
+    const el = document.createElement('div');
+    el.innerHTML = `<h1>Wi-Fi</h1><p class="muted">Pilih jaringan untuk menghubungkan perangkat ke internet.</p>
+      <div class="wifi-list" id="wifiList"></div>
+      <input id="wifiPw" type="password" placeholder="Password (jika perlu)" />`;
+    container.appendChild(el);
+    const wifiList = el.querySelector('#wifiList');
+    const wifiPw = el.querySelector('#wifiPw');
+
+    const nets = [
+      {name:'Rumah_Febri', sec:true, strength:3},
+      {name:'KoneksiSekolah', sec:true, strength:2},
+      {name:'Kantin_Free', sec:false, strength:2},
+      {name:'Tetangga_Guest', sec:true, strength:1}
+    ];
+    nets.forEach((n,i)=>{
+      const item = document.createElement('div');
+      item.className = 'wifi-item';
+      item.innerHTML = `<div><strong>${n.name}</strong><div class="muted" style="font-size:12px;margin-top:6px">${n.sec? 'Protected' : 'Open'}</div></div>
+        <div style="text-align:right">${'▮'.repeat(n.strength)}</div>`;
+      item.addEventListener('click', ()=>{
+        state.wifi = n;
+        wifiList.querySelectorAll('.wifi-item').forEach(x=>x.classList.remove('selected'));
+        item.classList.add('selected');
+        wifiPw.focus();
+      });
+      wifiList.appendChild(item);
+    });
+
+    wifiPw.addEventListener('input', ()=> state.wifiPw = wifiPw.value);
+
+    // quick hint
+    const hint = document.createElement('div');
+    hint.className = 'swipe-hint';
+    hint.textContent = 'Tip: klik salah satu jaringan lalu masukkan password (jika protected).';
+    container.appendChild(hint);
+  }
+
+  function renderFace(container){
+    const el = document.createElement('div');
+    el.innerHTML = `<h1>Face ID</h1><p class="muted">Daftarkan wajah untuk membuka perangkat (simulasi).</p>
+      <div class="face-scan"><div id="scanLine" class="scan-line"></div><div style="position:relative;z-index:2">🙂</div></div>
+      <div style="display:flex;gap:8px;"><button class="btn" id="enrollFace">Enroll Face</button><button class="btn ghost" id="skipFace">Skip</button></div>
+      <div id="faceMsg" class="muted" style="margin-top:8px"></div>`;
+    container.appendChild(el);
+
+    const scanLine = el.querySelector('#scanLine');
+    const enroll = el.querySelector('#enrollFace');
+    const skip = el.querySelector('#skipFace');
+    const msg = el.querySelector('#faceMsg');
+
+    enroll.addEventListener('click', ()=>{
+      enroll.textContent = 'Scanning...'; enroll.disabled=true;
+      scanLine.classList.remove('active');
+      void scanLine.offsetWidth;
+      scanLine.classList.add('active');
+      setTimeout(()=> {
+        scanLine.classList.remove('active');
+        state.face = true;
+        msg.textContent = '✅ Face ID terdaftar (simulasi).';
+        enroll.textContent = 'Re-Enroll'; enroll.disabled=false;
+      }, 1400);
+    });
+    skip.addEventListener('click', ()=> {
+      state.face = false;
+      msg.textContent = 'Face ID dilewati.';
+    });
+  }
+
+  function renderPass(container){
+    const el = document.createElement('div');
+    el.innerHTML = `<h1>Buat Passcode</h1><p class="muted">Buat passcode 4 digit untuk keamanan.</p>
+      <div class="passcode-circle" id="dots"></div>
+      <div class="keypad" id="keypad"></div>
+      <div class="muted" style="margin-top:6px">Gunakan angka untuk passcode (4 digit).</div>`;
+    container.appendChild(el);
+
+    const dots = el.querySelector('#dots');
+    const keypad = el.querySelector('#keypad');
+
+    function renderDots(n){
+      dots.innerHTML = '';
+      for(let i=0;i<4;i++){
+        const d = document.createElement('div'); d.className='dot' + (i< n? ' on' : '');
+        dots.appendChild(d);
+      }
+    }
+    renderDots(state.passcode.length);
+
+    function press(k){
+      if(state.passcode.length >=4) return;
+      state.passcode += String(k);
+      renderDots(state.passcode.length);
+    }
+    function backspace(){
+      state.passcode = state.passcode.slice(0,-1);
+      renderDots(state.passcode.length);
+    }
+
+    // keypad buttons 1..9, 0, back
+    const keys = ['1','2','3','4','5','6','7','8','9','0','←'];
+    keys.forEach(k=>{
+      const btn = document.createElement('div'); btn.className='key'; btn.textContent=k;
+      btn.addEventListener('click', ()=> {
+        if(k === '←') backspace(); else press(k);
+      });
+      keypad.appendChild(btn);
+    });
+  }
+
+  function renderSignin(container){
+    const el = document.createElement('div');
+    el.innerHTML = `<h1>Sign in to FEBOS</h1><p class="muted">Masuk untuk menyimpan pengaturan & backup (opsional).</p>
+      <input id="fid" type="email" placeholder="Email FEBOS ID (contoh: febri@febos.local)"/>
+      <input id="fidpw" type="password" placeholder="Password (opsional)"/>
+      <div style="display:flex;gap:8px;margin-top:8px;"><button class="btn" id="doSign">Sign In</button><button class="btn ghost" id="skipSign">Skip</button></div>
+      <div id="signMsg" class="muted" style="margin-top:8px"></div>`;
+    container.appendChild(el);
+
+    const fid = el.querySelector('#fid');
+    const fidpw = el.querySelector('#fidpw');
+    const doSign = el.querySelector('#doSign');
+    const skipSign = el.querySelector('#skipSign');
+    const signMsg = el.querySelector('#signMsg');
+
+    doSign.addEventListener('click', ()=>{
+      if(!fid.value){ signMsg.textContent='Masukkan email atau tekan Skip.'; return; }
+      doSign.textContent='Signing...'; doSign.disabled=true;
+      setTimeout(()=> {
+        state.febosId = fid.value;
+        signMsg.textContent = '✅ Signed in as ' + state.febosId + ' (simulasi).';
+        doSign.textContent='Signed'; doSign.disabled=false;
+      },1000);
+    });
+    skipSign.addEventListener('click', ()=> {
+      state.febosId = '';
+      signMsg.textContent = 'Sign in dilewati.';
+    });
+  }
+
+  function renderTerms(container){
+    const el = document.createElement('div');
+    el.innerHTML = `<h1>Syarat & Ketentuan</h1><p class="muted">Baca dan setujui syarat untuk menggunakan FEBOS (simulasi).</p>
+      <textarea rows="6" readonly style="width:100%;border-radius:10px;background:rgba(255,255,255,0.02);padding:10px">Dengan menggunakan FEBOS (simulasi), Anda setuju pada demo ini untuk tujuan edukasi.</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center"><input id="acc" type="checkbox"/><label for="acc" class="muted">Saya setuju</label></div>
+      <div class="muted" id="finishHint" style="margin-top:8px">Tekan Finish untuk menyelesaikan setup.</div>`;
+    container.appendChild(el);
+    const chk = el.querySelector('#acc');
+    chk.checked = state.accepted;
+    chk.addEventListener('change', ()=> state.accepted = chk.checked);
+  }
+
+  // ---------- validations ----------
+  function validateStep(i){
+    const s = steps[i].id;
+    if(s === 'wifi'){
+      if(!state.wifi) { alert('Pilih jaringan Wi-Fi terlebih dahulu.'); return false; }
+      if(state.wifi.sec && (!state.wifiPw || state.wifiPw.length < 1)){ alert('Masukkan password Wi-Fi.'); return false; }
+    }
+    if(s === 'pass'){
+      if(state.passcode.length < 4){ alert('Buat passcode minimal 4 digit.'); return false; }
+    }
+    if(s === 'terms'){
+      if(!state.accepted){ alert('Kamu harus menyetujui Syarat & Ketentuan.'); return false; }
+    }
+    return true;
+  }
+
+  function finishSetup(){
+    // finalize & show home
+    wizard.style.display='none';
+    homeScreen.style.display='block';
+    homeSub.textContent = state.febosId ? ('Signed in as ' + state.febosId) : ('No FEBOS ID — ' + (state.wifi? state.wifi.name : 'No Wi-Fi'));
+  }
+
+  // ---------- small UX: touch swipe to change steps ----------
+  let touchStartX = 0;
+  let touchEndX = 0;
+  const cardAreaElem = document.getElementById('cardArea');
+  cardAreaElem.addEventListener('touchstart', (e)=> { touchStartX = e.touches[0].clientX; }, {passive:true});
+  cardAreaElem.addEventListener('touchmove', (e)=> { touchEndX = e.touches[0].clientX; }, {passive:true});
+  cardAreaElem.addEventListener('touchend', ()=> {
+    const diff = touchStartX - touchEndX;
+    if(Math.abs(diff) < 60) return;
+    if(diff > 0){ // left swipe -> next
+      if(idx < steps.length-1) nextBtn.click();
+    } else { // right swipe -> back
+      if(idx > 0) backBtn.click();
+    }
+  });
+
+  // allow keyboard navigation for convenience
+  document.addEventListener('keydown', (e)=> {
+    if(e.key === 'ArrowRight') { if(idx < steps.length-1) nextBtn.click(); }
+    if(e.key === 'ArrowLeft') { if(idx > 0) backBtn.click(); }
+  });
+
+  // small helper: when wifi step renders, set click behavior to capture entered password
+  // we also populate state.wifiPw from the password field if present when connecting
+  // (handled in renderWifi by input listener)
+</script>
+</body>
+</html>
